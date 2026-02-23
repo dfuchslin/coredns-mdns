@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM alpine:edge AS base
+FROM alpine:edge AS base
 RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
 RUN apk add --no-cache openrc avahi2dns@testing avahi2dns-openrc@testing dbus avahi
 RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
