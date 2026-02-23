@@ -1,0 +1,11 @@
+.DS_Store
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+CHANGELOG.md
+Dockerfile.externalmdns
+LICENSE
+manifests/
+README.md

@@ -1,0 +1,90 @@
+# very much so inspired by the great work here: https://github.com/blake/external-mdns/blob/master/.github/workflows/ci.yaml
+
+---
+name: Continuous integration tasks
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:  # Allow manual triggering of the workflow
+
+jobs:
+
+  paths-filter:
+    name: Check if Dockerfile or Go code has changed
+    runs-on: ubuntu-latest
+    outputs:
+      modified: ${{ steps.filter.outputs.docker-or-gocode }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check if Dockerfile or Go code has changed
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker-or-gocode:
+              - Dockerfile
+              - '*/**.go'
+
+  docker:
+    name: Build multi-arch container image
+    if: needs.paths-filter.outputs.modified == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REGISTRY: ghcr.io
+      # The name of the image to push
+      IMAGE_NAME: external-mdns
+    # This job is dependent on the golang-ci job and paths-filter job.
+    # It will only run if the golang-ci job is successful and if the
+    # paths-filter job indicates that the Dockerfile or Go code have changed.
+    needs:
+      - golang-ci
+      - paths-filter
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,arm
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+
+      - name: Login to GitHub Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: >
+            linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/arm/v5
+          # Push the image to the registry if it is a push to master.
+          # For pull requests, we build without pushing to verify the build.
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
