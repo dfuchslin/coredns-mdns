@@ -5,10 +5,10 @@ name: Continuous integration tasks
 on:  # yamllint disable-line rule:truthy
   pull_request:
     branches:
-      - master
+      - main
   push:
     branches:
-      - master
+      - main
   workflow_dispatch:  # Allow manual triggering of the workflow
 
 jobs:
@@ -82,7 +82,7 @@ jobs:
           file: ./Dockerfile
           platforms: >
             linux/amd64,linux/arm64,linux/arm/v7
-          # Push the image to the registry if it is a push to master.
+          # Push the image to the registry if it is a push to main.
           # For pull requests, we build without pushing to verify the build.
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
