@@ -21,7 +21,7 @@ jobs:
       # The registries to push the image to
       GITHUB_REGISTRY: ghcr.io
       # The name of the image to push
-      IMAGE_NAME: external-mdns
+      IMAGE_NAME: coredns-mdns
 
     permissions:
       # Permit generating an artifact attestation for the image
