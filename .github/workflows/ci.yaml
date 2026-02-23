@@ -81,7 +81,7 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: >
-            linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/arm/v5
+            linux/amd64,linux/arm64,linux/arm/v7
           # Push the image to the registry if it is a push to master.
           # For pull requests, we build without pushing to verify the build.
           push: ${{ github.event_name != 'pull_request' }}
