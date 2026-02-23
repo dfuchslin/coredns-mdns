@@ -16,9 +16,9 @@ RUN curl -fLO https://github.com/coredns/coredns/archive/refs/tags/v${COREDNS_VE
     if ! grep -q "mdns" plugin.cfg; then \
         sed -i '$a mdns:github.com/openshift/coredns-mdns' plugin.cfg; \
     fi && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=$(echo ${TARGETVARIANT} | cut -c2) \
-    go build -o /coredns .
-
+    go get github.com/openshift/coredns-mdns && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=$(echo ${TARGETVARIANT} | cut -c2) go generate && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=$(echo ${TARGETVARIANT} | cut -c2) go build -o /coredns .
 
 FROM --platform=$BUILDPLATFORM ${DEBIAN_IMAGE} AS build
 ARG DEBIAN_FRONTEND=noninteractive
