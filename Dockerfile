@@ -1,37 +1,28 @@
-ARG GOLANG_IMAGE=golang:1.26.0
-ARG DEBIAN_IMAGE=debian:stable-slim
-ARG BASE=gcr.io/distroless/static-debian12:nonroot
+FROM --platform=$BUILDPLATFORM alpine:edge AS base
+RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+RUN apk add --no-cache openrc avahi2dns@testing avahi2dns-openrc@testing dbus avahi
+RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
+  sed -i \
+  -e 's/#rc_sys=".*"/rc_sys="docker"/g' \
+  -e 's/#rc_env_allow=".*"/rc_env_allow="\*"/g' \
+  -e 's/#rc_crashed_stop=.*/rc_crashed_stop=NO/g' \
+  -e 's/#rc_crashed_start=.*/rc_crashed_start=YES/g' \
+  -e 's/#rc_provide=".*"/rc_provide="loopback net"/g' \
+  /etc/rc.conf && \
+  rm -f /etc/init.d/hwdrivers \
+  /etc/init.d/hwclock \
+  /etc/init.d/hwdrivers \
+  /etc/init.d/modules \
+  /etc/init.d/modules-load \
+  /etc/init.d/modloop
+RUN echo 'command_args="--debug --port 53"' > /etc/conf.d/avahi2dns
+RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns
 
-FROM --platform=$BUILDPLATFORM ${GOLANG_IMAGE} AS gobuild
-ARG COREDNS_VERSION=1.14.1
-ARG TARGETOS
-ARG TARGETARCH
-ARG TARGETVARIANT
+RUN cat > /bin/entrypoint.sh <<EOF && chmod +x /bin/entrypoint.sh
+#!/bin/ash
 
-WORKDIR /go/src/github.com/coredns
-RUN curl -fLO https://github.com/coredns/coredns/archive/refs/tags/v${COREDNS_VERSION}.tar.gz && \
-    tar -xzf v${COREDNS_VERSION}.tar.gz && \
-    mv coredns-${COREDNS_VERSION} coredns && \
-    cd coredns && \
-    if ! grep -q "mdns" plugin.cfg; then \
-        sed -i '$a mdns:github.com/openshift/coredns-mdns' plugin.cfg; \
-    fi && \
-    go get github.com/openshift/coredns-mdns && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=$(echo ${TARGETVARIANT} | cut -c2) go generate && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=$(echo ${TARGETVARIANT} | cut -c2) go build -o /coredns .
+syslogd
 
-FROM --platform=$BUILDPLATFORM ${DEBIAN_IMAGE} AS build
-ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get -qq update \
-    && apt-get -qq --no-install-recommends install libcap2-bin
-COPY --from=gobuild /coredns /coredns
-RUN setcap cap_net_bind_service=+ep /coredns
-
-FROM ${BASE}
-COPY --from=build /coredns /coredns
-USER nonroot:nonroot
-# Reset the working directory inherited from the base image back to the expected default:
-# https://github.com/coredns/coredns/issues/7009#issuecomment-3124851608
-WORKDIR /
-EXPOSE 53 53/udp
-ENTRYPOINT ["/coredns"]
+exec /sbin/init
+EOF
+CMD ["/bin/entrypoint.sh"]
