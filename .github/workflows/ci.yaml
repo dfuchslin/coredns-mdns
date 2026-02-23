@@ -43,7 +43,6 @@ jobs:
     # It will only run if the golang-ci job is successful and if the
     # paths-filter job indicates that the Dockerfile or Go code have changed.
     needs:
-      - golang-ci
       - paths-filter
     permissions:
       attestations: write
