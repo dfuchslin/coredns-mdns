@@ -21,8 +21,10 @@ RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns
 RUN cat > /bin/entrypoint.sh <<EOF && chmod +x /bin/entrypoint.sh
 #!/bin/ash
 
-syslogd
+# Start syslogd to redirect all system logs to stdout
+syslogd -O /dev/stdout
 
+# Execute the init system
 exec /sbin/init
 EOF
 CMD ["/bin/entrypoint.sh"]
