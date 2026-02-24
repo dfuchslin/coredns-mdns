@@ -15,7 +15,9 @@ RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
   /etc/init.d/modules \
   /etc/init.d/modules-load \
   /etc/init.d/modloop
-RUN echo 'command_args="--debug --port 53"' > /etc/conf.d/avahi2dns
+RUN echo 'command_args="--debug --port 53 --addr '0.0.0.0'"' > /etc/conf.d/avahi2dns
+RUN echo 'command_args="--debug"' > /etc/conf.d/avahi-daemon && \
+    sed -i 's/#debug=no/debug=yes/' /etc/avahi/avahi-daemon.conf
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns
 
 RUN cat > /bin/entrypoint.sh <<EOF && chmod +x /bin/entrypoint.sh
