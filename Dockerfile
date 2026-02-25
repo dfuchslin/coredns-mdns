@@ -18,7 +18,7 @@ RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
 RUN echo 'command_args="--debug --port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns
 RUN echo 'command_args="--debug"' > /etc/conf.d/avahi-daemon && \
     sed -i 's/#debug=no/debug=yes/' /etc/avahi/avahi-daemon.conf
-RUN echo 'command_args="-dns.port=53 -conf /corefile"' > /etc/conf.d/coredns
+RUN echo 'command_args="-conf /corefile"' > /etc/conf.d/coredns
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
 RUN cat > /bin/entrypoint.sh <<EOF && chmod +x /bin/entrypoint.sh
