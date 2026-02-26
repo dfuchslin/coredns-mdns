@@ -24,17 +24,29 @@ echo "Starting dbus-daemon..."
 dbus-daemon --system --nofork --nopidfile &
 DBUS_PID=$!
 
-# Wait until system bus socket exists
-echo "Waiting for DBus socket..."
+echo "Waiting for DBus to become responsive..."
+
 for i in $(seq 1 50); do
-    if [ -S /run/dbus/system_bus_socket ]; then
+    if dbus-send --system \
+        --dest=org.freedesktop.DBus \
+        --type=method_call \
+        --print-reply \
+        /org/freedesktop/DBus \
+        org.freedesktop.DBus.ListNames \
+        >/dev/null 2>&1; then
         break
     fi
-    sleep 0.1
+    sleep 0.2
 done
 
-if [ ! -S /run/dbus/system_bus_socket ]; then
-    echo "ERROR: DBus socket not created"
+if ! dbus-send --system \
+    --dest=org.freedesktop.DBus \
+    --type=method_call \
+    --print-reply \
+    /org/freedesktop/DBus \
+    org.freedesktop.DBus.ListNames \
+    >/dev/null 2>&1; then
+    echo "ERROR: DBus not responding"
     exit 1
 fi
 
