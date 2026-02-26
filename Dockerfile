@@ -1,39 +1,20 @@
-FROM alpine:edge AS base
+FROM alpine:edge
+
 RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-RUN apk add --no-cache openrc avahi2dns@testing avahi2dns-openrc@testing dbus avahi coredns
-RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
-  sed -i \
-  -e 's/#rc_sys=".*"/rc_sys="docker"/g' \
-  -e 's/#rc_env_allow=".*"/rc_env_allow="\*"/g' \
-  -e 's/#rc_crashed_stop=.*/rc_crashed_stop=NO/g' \
-  -e 's/#rc_crashed_start=.*/rc_crashed_start=YES/g' \
-  -e 's/#rc_provide=".*"/rc_provide="loopback net"/g' \
-  /etc/rc.conf && \
-  rm -f /etc/init.d/hwdrivers \
-  /etc/init.d/hwclock \
-  /etc/init.d/hwdrivers \
-  /etc/init.d/modules \
-  /etc/init.d/modules-load \
-  /etc/init.d/modloop
-RUN echo 'command_args="--debug --port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns && \
-    echo 'start_stop_daemon_args="--stdout /var/log/${SVCNAME}/${SVCNAME}.log --stderr /var/log/${SVCNAME}/${SVCNAME}.log"' >> /etc/init.d/avahi2dns && \
-    echo 'output_logger=""' >> /etc/init.d/avahi2dns && \
-    echo 'error_logger=""' >> /etc/init.d/avahi2dns && \
-    mkdir -p /var/log/avahi2dns
-RUN echo 'command_args="--debug"' > /etc/conf.d/avahi-daemon && \
-    sed -i 's/#debug=no/debug=yes/' /etc/avahi/avahi-daemon.conf
-RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
-RUN cat > /bin/entrypoint.sh <<'EOF' && chmod +x /bin/entrypoint.sh
-#!/bin/ash
+RUN apk add --no-cache \
+    dbus \
+    avahi \
+    avahi2dns@testing \
+    coredns \
+    tini
 
-# Start syslogd to redirect all system logs to stdout
-syslogd -O /dev/stdout
-
-# Execute the init system
-exec /sbin/init
-EOF
+COPY entrypoint.sh /bin/entrypoint.sh
+RUN chmod +x /bin/entrypoint.sh
 
 ENV COREDNS_CONFIG=/etc/coredns/Corefile
-ENV CORENDS_EXTRA_ARGS=""
+ENV AVAHI2DNS_BIND_PORT=5454
+ENV AVAHI2DNS_BIND_ADDRESS=0.0.0.0
+
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/bin/entrypoint.sh"]
