@@ -1,21 +1,26 @@
 #!/bin/ash
 set -e
 
-# Create required runtime directories
+# Ensure runtime dirs
 mkdir -p /run/dbus
 mkdir -p /var/run/dbus
 
-# Start dbus in foreground
+# Generate machine-id (required for system bus)
+if [ ! -f /etc/machine-id ]; then
+    dbus-uuidgen > /etc/machine-id
+fi
+
+# Start dbus system bus
 dbus-daemon --system --nofork --nopidfile &
 DBUS_PID=$!
 
-# Start avahi in foreground mode
+# Start avahi
 avahi-daemon --no-chroot --debug &
 AVAHI_PID=$!
 
-# Start avahi2dns in foreground
+# Start avahi2dns
 avahi2dns --debug --port $AVAHI2DNS_BIND_PORT --addr $AVAHI2DNS_BIND_ADDRESS &
 A2D_PID=$!
 
-# Start coredns in foreground (this becomes PID 1)
+# Start coredns
 exec coredns -conf $COREDNS_CONFIG
