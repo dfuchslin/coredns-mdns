@@ -16,10 +16,10 @@ RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
   /etc/init.d/modules-load \
   /etc/init.d/modloop
 RUN echo 'command_args="--debug --port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns && \
-    echo 'output_log="/dev/stdout"' >> /etc/conf.d/avahi2dns && \
-    echo 'error_log="/dev/stderr"' >> /etc/conf.d/avahi2dns && \
-    echo 'output_logger="cat"' >> /etc/conf.d/avahi2dns && \
-    echo 'error_logger="cat"' >> /etc/conf.d/avahi2dns
+    echo 'start_stop_daemon_args="--stdout /var/log/${SVCNAME}/${SVCNAME}.log --stderr /var/log/${SVCNAME}/${SVCNAME}.log"' >> /etc/init.d/avahi2dns && \
+    echo 'output_logger=""' >> /etc/init.d/avahi2dns && \
+    echo 'error_logger=""' >> /etc/init.d/avahi2dns && \
+    mkdir -p /var/log/avahi2dns
 RUN echo 'command_args="--debug"' > /etc/conf.d/avahi-daemon && \
     sed -i 's/#debug=no/debug=yes/' /etc/avahi/avahi-daemon.conf
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
