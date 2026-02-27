@@ -48,7 +48,8 @@ RUN sed -i \
     /etc/init.d/avahi2dns
 RUN sed -i '1a\supervisor="supervise-daemon"' /etc/init.d/avahi2dns && \
     sed -i '2a\pidfile="/run/avahi2dns.pid"' /etc/init.d/avahi2dns && \
-    sed -i '3a\start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"' /etc/init.d/avahi2dns
+    sed -i '3a\output_log="/proc/1/fd/1"' /etc/init.d/avahi2dns && \
+    sed -i '4a\error_log="/proc/1/fd/2"' /etc/init.d/avahi2dns
 
 # --- avahi-daemon ---
 # The packaged init script hardcodes "avahi-daemon -D" in a custom start() and
@@ -62,7 +63,8 @@ RUN sed -i '1a\supervisor="supervise-daemon"' /etc/init.d/avahi-daemon && \
     sed -i '2a\command="/usr/sbin/avahi-daemon"' /etc/init.d/avahi-daemon && \
     sed -i '3a\command_args="--no-drop-root --no-chroot"' /etc/init.d/avahi-daemon && \
     sed -i '4a\pidfile="/run/avahi-daemon.pid"' /etc/init.d/avahi-daemon && \
-    sed -i '5a\start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"' /etc/init.d/avahi-daemon
+    sed -i '5a\output_log="/proc/1/fd/1"' /etc/init.d/avahi-daemon && \
+    sed -i '6a\error_log="/proc/1/fd/2"' /etc/init.d/avahi-daemon
 
 # --- dbus ---
 # Remove --syslog-only so dbus logs go to stderr (captured by start-stop-daemon).

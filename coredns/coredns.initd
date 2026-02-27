@@ -9,7 +9,8 @@ supervisor="supervise-daemon"
 command="/usr/bin/coredns"
 command_args="-conf ${COREDNS_CONFIG}"
 pidfile="/run/coredns.pid"
-start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"
+output_log="/proc/1/fd/1"
+error_log="/proc/1/fd/2"
 
 depend() {
 	after net
