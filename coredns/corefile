@@ -22,7 +22,7 @@
     # Bare single-label names (no dots) get rewritten to <name>.local.
     # "answer auto" rewrites the response back so the client sees the
     # original name it asked for.
-    rewrite name regex (^[^.]+\.)$ {1}local. answer auto
+    rewrite name regex ^([^.]+)\.$ {1}.local. answer auto
 
     # Send all queries to avahi2dns (mDNS bridge) first
     forward . 127.0.0.1:5454 {

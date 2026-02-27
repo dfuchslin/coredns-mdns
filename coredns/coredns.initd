@@ -3,7 +3,7 @@
 description="CoreDNS DNS server"
 
 # Override via /etc/conf.d/coredns or environment
-: ${COREDNS_CONFIG:=/etc/coredns/Corefile}
+: ${COREDNS_CONFIG:=/etc/coredns/corefile}
 
 supervisor="supervise-daemon"
 command="/usr/bin/coredns"

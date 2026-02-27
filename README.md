@@ -37,7 +37,7 @@ mDNS multicast (224.0.0.251 / ff02::fb)
 services:
   coredns:
     container_name: coredns-mdns
-    image: ghcr.io/dfuchslin/coredns-mdns:main
+    image: ghcr.io/dfuchslin/coredns-mdns:latest
     restart: unless-stopped
     network_mode: host
     privileged: true
@@ -45,24 +45,9 @@ services:
       - NET_RAW
       - NET_ADMIN
     volumes:
-      - ./Corefile:/etc/coredns/Corefile
+      - ./corefile:/etc/coredns/corefile
     env:
-      COREDNS_CONFIG: /etc/coredns/Corefile
+      COREDNS_CONFIG: /etc/coredns/corefile
+      UPSTREAM_DNS: 192.168.1.1
 
-```
-
-```
-cat Corefile
-
-. {
-    log
-    errors
-    cache 30
-    forward . 9.9.9.9
-}
-
-local {
-    mdns
-    cache 10
-}
 ```
