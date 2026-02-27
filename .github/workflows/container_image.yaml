@@ -85,9 +85,10 @@ jobs:
             # (i.e., the event is a tag release)
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.event.base_ref == format('refs/heads/{0}', github.event.repository.default_branch) && startsWith(github.ref, 'refs/tags/v') }}
 
-            # Tag the image with the commit SHA when manually triggered and is not
-            # a tag release. This is useful for testing and debugging.
-            type=sha,enable=${{ (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !startsWith(github.ref, 'ref/tags/v') }}
+            # Tag the image with the commit SHA when it is not a tag release.
+            type=sha,enable=${{ (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && !startsWith(github.ref, 'refs/tags/v') }}
+            # Tag the image with the default branch (main) when it's a push on main
+            type=raw,value=${{ github.event.repository.default_branch }},enable=${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
       - name: Login to GitHub Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
