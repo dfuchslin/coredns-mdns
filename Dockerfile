@@ -66,33 +66,6 @@ RUN sed -i \
 # conf.d: keep extra args empty (logging is via Corefile 'log' plugin)
 RUN sed -i 's/^COREDNS_EXTRA_ARGS=.*/COREDNS_EXTRA_ARGS=""/' /etc/conf.d/coredns
 
-# --- Corefile ---
-# Rewrites bare hostnames (no dots) to <name>.local, queries avahi2dns.
-# Also forwards .local directly. Everything else goes to upstream DNS.
-RUN cat > /etc/coredns/Corefile <<'COREFILE'
-. {
-    log
-    errors
-
-    # Rewrite bare single-label names (no dots) to <name>.local
-    template ANY ANY {
-        match "^([^.]+)\.$"
-        answer "{{ .Name }} 60 IN CNAME {{ index .Match 1 }}.local."
-        fallthrough
-    }
-
-    # Forward .local queries to avahi2dns
-    forward local. 127.0.0.1:5454
-
-    # Forward everything else to upstream
-    forward . /etc/resolv.conf
-
-    cache 30
-    loop
-    reload
-}
-COREFILE
-
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
 ENV COREDNS_CONFIG=/etc/coredns/Corefile
