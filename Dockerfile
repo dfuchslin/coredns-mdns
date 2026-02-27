@@ -1,7 +1,25 @@
+FROM golang:1.26.0 AS gobuild
+ARG COREDNS_VERSION=1.14.1
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+WORKDIR /go/src/github.com/coredns
+RUN curl -fLO https://github.com/coredns/coredns/archive/refs/tags/v${COREDNS_VERSION}.tar.gz && \
+    tar -xzf v${COREDNS_VERSION}.tar.gz && \
+    mv coredns-${COREDNS_VERSION} coredns && \
+    cd coredns && \
+    if ! grep -q "alternate:" plugin.cfg; then \
+    sed -i '/^forward:forward$/i alternate:github.com/coredns/alternate' plugin.cfg; \
+    fi && \
+    go get github.com/coredns/alternate && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=$(echo ${TARGETVARIANT} | cut -c2) go generate && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=$(echo ${TARGETVARIANT} | cut -c2) go build -o /coredns .
+
 FROM alpine:edge AS base
 
 RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-RUN apk add --no-cache openrc avahi2dns@testing avahi2dns-openrc@testing dbus avahi coredns
+RUN apk add --no-cache openrc avahi2dns@testing avahi2dns-openrc@testing dbus avahi libcap-setcap
 
 # --- OpenRC Docker adjustments ---
 RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
@@ -53,26 +71,19 @@ RUN sed -i 's/--syslog-only //' /etc/init.d/dbus
 RUN printf 'output_logger=""\nerror_logger=""\noutput_log="/proc/1/fd/1"\nerror_log="/proc/1/fd/2"\n' > /etc/conf.d/dbus
 
 # --- coredns ---
-# The packaged init script uses supervise-daemon and logs to /var/log/coredns/.
-# Fix: run as root (we're in Docker), log to /proc/1/fd/{1,2} so Docker captures it,
-# and run in foreground.
-RUN sed -i \
-    -e 's/^command_user=.*/command_user="root"/' \
-    -e 's|^start_stop_daemon_args=.*|start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"|' \
-    -e '/^[[:space:]]*--stderr/d' \
-    -e 's/^capabilities=.*/# capabilities removed for Docker/' \
-    -e 's/after net/after net\n\tneed avahi2dns/' \
-    /etc/init.d/coredns
-# conf.d: keep extra args empty (logging is via Corefile 'log' plugin)
-RUN sed -i 's/^COREDNS_EXTRA_ARGS=.*/COREDNS_EXTRA_ARGS=""/' /etc/conf.d/coredns
-
-# --- Corefile ---
-COPY Corefile /etc/coredns/Corefile
+# Custom-compiled CoreDNS with the alternate plugin. The Alpine coredns package
+# is not installed — we COPY the binary and our own OpenRC init script.
+COPY --from=gobuild /coredns /usr/bin/coredns
+RUN setcap cap_net_bind_service=+ep /usr/bin/coredns
+COPY coredns/coredns.initd /etc/init.d/coredns
+RUN chmod +x /etc/init.d/coredns
+RUN mkdir -p /etc/coredns
+COPY coredns/Corefile /etc/coredns/Corefile
 
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
+# Default upstream DNS — override at runtime: docker run -e UPSTREAM_DNS=10.0.0.1 ...
+ENV UPSTREAM_DNS=192.168.1.1
 ENV COREDNS_CONFIG=/etc/coredns/Corefile
-# CORENDS_EXTRA_ARGS misspelled (defined in the alpine coredns package)
-ENV CORENDS_EXTRA_ARGS=""
 
 CMD ["/sbin/init"]
