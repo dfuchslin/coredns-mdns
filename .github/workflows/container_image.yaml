@@ -105,6 +105,10 @@ jobs:
           platforms: >
             linux/amd64,linux/arm64
           push: true
+          # Disable BuildKit inline provenance attestation — it creates an
+          # extra "unknown/unknown" manifest entry in the image index.
+          # Provenance is handled by the attest-build-provenance step below.
+          provenance: false
           annotations: ${{ steps.meta.outputs.annotations }}
           # Use the same annotations as labels on the image
           labels: ${{ steps.meta.outputs.annotations }}
