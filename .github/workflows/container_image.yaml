@@ -119,4 +119,7 @@ jobs:
         with:
           subject-name: ${{ env.GITHUB_REGISTRY }}/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          # Don't push attestation to the registry — it creates a separate
+          # sha256-<digest> tag that isn't an image. The attestation is still
+          # stored as a GitHub artifact and verifiable via `gh attestation verify`.
+          push-to-registry: false
