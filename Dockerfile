@@ -9,7 +9,7 @@ RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
     -e 's/#rc_env_allow=".*"/rc_env_allow="\*"/g' \
     -e 's/#rc_crashed_stop=.*/rc_crashed_stop=NO/g' \
     -e 's/#rc_crashed_start=.*/rc_crashed_start=YES/g' \
-    -e 's/#rc_provide=".*"/rc_provide="loopback net"/g' \
+    -e 's/#rc_provide=".*"/rc_provide="loopback net dev"/g' \
     -e 's/#rc_logger="YES"/rc_logger="NO"/' \
     /etc/rc.conf && \
     rm -f /etc/init.d/hwdrivers \
@@ -20,6 +20,7 @@ RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
     /etc/init.d/modloop
 
 RUN echo 'command_args="--debug --port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns && \
+    echo 'command_background=false' >> /etc/init.d/avahi2dns && \
     echo 'output_logger=""' >> /etc/init.d/avahi2dns && \
     echo 'error_logger=""' >> /etc/init.d/avahi2dns
 RUN echo 'command_args="--no-chroot --debug"' > /etc/conf.d/avahi-daemon && \
@@ -29,6 +30,8 @@ RUN echo 'command_args="--no-chroot --debug"' > /etc/conf.d/avahi-daemon && \
 RUN echo 'command_args="--nofork --nopidfile"' > /etc/conf.d/dbus && \
     echo 'output_logger=""' >> /etc/init.d/dbus && \
     echo 'error_logger=""' >> /etc/init.d/dbus
+RUN echo 'start_stop_daemon_args=""' > /etc/init.d/coredns && \
+    echo 'command_background=false' >> /etc/init.d/coredns
 
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
