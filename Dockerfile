@@ -33,35 +33,18 @@ RUN sed -i '1a\supervisor="supervise-daemon"' /etc/init.d/avahi2dns && \
     sed -i '3a\start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"' /etc/init.d/avahi2dns
 
 # --- avahi-daemon ---
-# The packaged init script hardcodes "avahi-daemon -D" (daemonize) in a custom
-# start() function, ignoring command_args from conf.d entirely. Replace it with
-# a standard OpenRC script using supervise-daemon so it backgrounds properly
-# while still sending output to Docker's stdout/stderr.
-# No --debug flag: only warnings/errors will be logged.
-RUN cat > /etc/init.d/avahi-daemon <<'EOF'
-#!/sbin/openrc-run
-
-description="Avahi mDNS/DNS-SD daemon"
-supervisor="supervise-daemon"
-command="/usr/sbin/avahi-daemon"
-command_args="--no-drop-root --no-chroot"
-pidfile="/run/${RC_SVCNAME}.pid"
-start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"
-extra_started_commands="reload"
-
-depend() {
-	before netmount nfsmount
-	use net
-	need dbus hostname
-}
-
-reload() {
-	ebegin "Reloading avahi-daemon"
-	/usr/sbin/avahi-daemon -r
-	eend $?
-}
-EOF
-RUN chmod 755 /etc/init.d/avahi-daemon
+# The packaged init script hardcodes "avahi-daemon -D" in a custom start() and
+# "avahi-daemon -k" in stop(), ignoring conf.d entirely. Remove those custom
+# functions and add supervise-daemon variables so OpenRC manages the process.
+RUN sed -i \
+    -e '/^start()/,/^}/d' \
+    -e '/^stop()/,/^}/d' \
+    /etc/init.d/avahi-daemon
+RUN sed -i '1a\supervisor="supervise-daemon"' /etc/init.d/avahi-daemon && \
+    sed -i '2a\command="/usr/sbin/avahi-daemon"' /etc/init.d/avahi-daemon && \
+    sed -i '3a\command_args="--no-drop-root --no-chroot"' /etc/init.d/avahi-daemon && \
+    sed -i '4a\pidfile="/run/avahi-daemon.pid"' /etc/init.d/avahi-daemon && \
+    sed -i '5a\start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"' /etc/init.d/avahi-daemon
 
 # --- dbus ---
 # Remove --syslog-only so dbus logs go to stderr (captured by start-stop-daemon).
