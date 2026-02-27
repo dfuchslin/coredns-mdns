@@ -78,12 +78,12 @@ RUN setcap cap_net_bind_service=+ep /usr/bin/coredns
 COPY coredns/coredns.initd /etc/init.d/coredns
 RUN chmod +x /etc/init.d/coredns
 RUN mkdir -p /etc/coredns
-COPY coredns/Corefile /etc/coredns/Corefile
+COPY coredns/corefile /etc/coredns/corefile
 
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
 # Default upstream DNS — override at runtime: docker run -e UPSTREAM_DNS=10.0.0.1 ...
 ENV UPSTREAM_DNS=192.168.1.1
-ENV COREDNS_CONFIG=/etc/coredns/Corefile
+ENV COREDNS_CONFIG=/etc/coredns/corefile
 
 CMD ["/sbin/init"]
