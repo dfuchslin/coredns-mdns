@@ -8,11 +8,26 @@
 
 # coredns-mdns
 
-Builds a docker image with [coredns](https://coredns.io/) and the [mdns plugin](https://coredns.io/explugins/mdns/) enabled for service discovery.
+A DNS to mDNS bridge using coredns, avahi2dns, and avahi-daemon.
 
-Uses the [Dockerfile from coredns](https://github.com/coredns/coredns/blob/master/Dockerfile) but adds a step to download the go source for the specified version, add mdns to the list of plugins, and compile for the correct architecture.
+Bare hostname queries will be tried to be resolved by mdns, by appending '.local'.
+Hostnames ending in .local will be tried to be resolved by mdns.
+Other hostnames will be forwarded to the upstream resolver.
 
-CI and image publish workflows were heavily inspired by [blake c's external-mdns project](https://github.com/blake/external-mdns).
+The image publish workflow was heavily inspired by [blake c's external-mdns project](https://github.com/blake/external-mdns).
+
+```
+Client
+        ↓
+CoreDNS (:53)
+        ↓ forward .local
+avahi2dns (:5454)
+        ↓
+avahi-daemon
+        ↓
+mDNS multicast (224.0.0.251 / ff02::fb)
+```
+
 
 
 ## Usage
@@ -21,27 +36,18 @@ CI and image publish workflows were heavily inspired by [blake c's external-mdns
 ```
 services:
   coredns:
-    image: ghcr.io/dfuchslin/coredns-mdns:main
     container_name: coredns-mdns
-    network_mode: host
-    volumes:
-      - ./Corefile:/Corefile
-    command: -conf /Corefile
+    image: ghcr.io/dfuchslin/coredns-mdns:latest
     restart: unless-stopped
-```
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - ./corefile:/etc/coredns/corefile
+    env:
+      COREDNS_CONFIG: /etc/coredns/corefile
+      UPSTREAM_DNS: 192.168.1.1
 
-```
-cat Corefile
-
-. {
-    log
-    errors
-    cache 30
-    forward . 9.9.9.9
-}
-
-local {
-    mdns
-    cache 10
-}
 ```

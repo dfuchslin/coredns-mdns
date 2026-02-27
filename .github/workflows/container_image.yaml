@@ -1,17 +1,21 @@
 # very much so inspired by the great work here: https://github.com/blake/external-mdns/blob/master/.github/workflows/container_image.yaml
 
 ---
-name: Build and push container image to image registries
-on:  # yamllint disable-line rule:truthy
+name: Build and push container image
+on:
+  workflow_dispatch:  # Allow manual triggering of the workflow
+  pull_request:
+    branches:
+      - main
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
   release:
     types:
       - published
       - released
-  workflow_dispatch:  # Allow manual triggering of the workflow
-
 jobs:
 
   push_to_registries:
@@ -40,7 +44,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: arm64,arm
+          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -52,7 +56,6 @@ jobs:
           # Attach metadata annotations to both the image index and the manifest
           DOCKER_METADATA_ANNOTATIONS_LEVELS: index,manifest
         with:
-          # yamllint disable rule:line-length
           images: |
             name=${{ env.GITHUB_REGISTRY }}/${{ github.repository }}
           # Disable generating the 'latest' tag on the image.
@@ -84,8 +87,7 @@ jobs:
 
             # Tag the image with the commit SHA when manually triggered and is not
             # a tag release. This is useful for testing and debugging.
-            type=sha,enable=${{ github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'ref/tags/v') }}
-          # yamllint enable rule:line-length
+            type=sha,enable=${{ (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !startsWith(github.ref, 'ref/tags/v') }}
 
       - name: Login to GitHub Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
@@ -101,8 +103,12 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: >
-            linux/amd64,linux/arm64,linux/arm/v7
-          push: ${{ github.event_name != 'pull_request' }}
+            linux/amd64,linux/arm64
+          push: true
+          # Disable BuildKit inline provenance attestation — it creates an
+          # extra "unknown/unknown" manifest entry in the image index.
+          # Provenance is handled by the attest-build-provenance step below.
+          provenance: false
           annotations: ${{ steps.meta.outputs.annotations }}
           # Use the same annotations as labels on the image
           labels: ${{ steps.meta.outputs.annotations }}
@@ -113,4 +119,7 @@ jobs:
         with:
           subject-name: ${{ env.GITHUB_REGISTRY }}/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          # Don't push attestation to the registry — it creates a separate
+          # sha256-<digest> tag that isn't an image. The attestation is still
+          # stored as a GitHub artifact and verifiable via `gh attestation verify`.
+          push-to-registry: false

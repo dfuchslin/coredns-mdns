@@ -1,0 +1,36 @@
+# Resolve bare hostnames via mDNS (avahi2dns), fall back to upstream router DNS.
+#
+# Flow for a bare hostname like "homeassistant":
+#   1. rewrite: homeassistant → homeassistant.local
+#   2. forward: ask avahi2dns (mDNS) for homeassistant.local
+#   3. alternate: if mDNS fails (NXDOMAIN/SERVFAIL), ask the upstream router
+#      for the ORIGINAL query (homeassistant) — not the rewritten .local name
+#
+# Flow for all other queries (e.g. google.com):
+#   1. forward: ask avahi2dns — it won't know, returns NXDOMAIN/SERVFAIL
+#   2. alternate: falls through to the upstream router
+#
+# UPSTREAM_DNS is set via environment variable (default: 192.168.1.1).
+# Override at runtime: docker run -e UPSTREAM_DNS=10.0.0.1 ...
+
+.:53 {
+    errors
+    log
+    cache 30
+    loop
+
+    # Bare single-label names (no dots) get rewritten to <name>.local.
+    # "answer auto" rewrites the response back so the client sees the
+    # original name it asked for.
+    rewrite name regex ^([^.]+)\.$ {1}.local. answer auto
+
+    # Send all queries to avahi2dns (mDNS bridge) first
+    forward . 127.0.0.1:5454 {
+        prefer_udp
+        max_fails 1
+    }
+
+    # If avahi2dns returns NXDOMAIN, SERVFAIL, or REFUSED, forward the original
+    # (pre-rewrite) query to the upstream router DNS.
+    alternate original NXDOMAIN,SERVFAIL,REFUSED . {$UPSTREAM_DNS}
+}

@@ -1,0 +1,18 @@
+#!/sbin/openrc-run
+
+description="CoreDNS DNS server"
+
+# Override via /etc/conf.d/coredns or environment
+: ${COREDNS_CONFIG:=/etc/coredns/corefile}
+
+supervisor="supervise-daemon"
+command="/usr/bin/coredns"
+command_args="-conf ${COREDNS_CONFIG}"
+pidfile="/run/coredns.pid"
+output_log="/proc/1/fd/1"
+error_log="/proc/1/fd/2"
+
+depend() {
+	after net
+	need avahi2dns
+}
