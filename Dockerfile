@@ -66,6 +66,9 @@ RUN sed -i \
 # conf.d: keep extra args empty (logging is via Corefile 'log' plugin)
 RUN sed -i 's/^COREDNS_EXTRA_ARGS=.*/COREDNS_EXTRA_ARGS=""/' /etc/conf.d/coredns
 
+# --- Corefile ---
+COPY Corefile /etc/coredns/Corefile
+
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
 ENV COREDNS_CONFIG=/etc/coredns/Corefile

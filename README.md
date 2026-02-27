@@ -16,6 +16,19 @@ Other hostnames will be forwarded to the upstream resolver.
 
 The image publish workflow was heavily inspired by [blake c's external-mdns project](https://github.com/blake/external-mdns).
 
+```
+Client
+        ↓
+CoreDNS (:53)
+        ↓ forward .local
+avahi2dns (:5454)
+        ↓
+avahi-daemon
+        ↓
+mDNS multicast (224.0.0.251 / ff02::fb)
+```
+
+
 
 ## Usage
 
@@ -28,6 +41,9 @@ services:
     restart: unless-stopped
     network_mode: host
     privileged: true
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     volumes:
       - ./Corefile:/etc/coredns/Corefile
     env:
