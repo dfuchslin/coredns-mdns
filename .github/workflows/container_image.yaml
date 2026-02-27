@@ -87,7 +87,7 @@ jobs:
 
             # Tag the image with the commit SHA when manually triggered and is not
             # a tag release. This is useful for testing and debugging.
-            type=sha,enable=${{ github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'ref/tags/v') }}
+            type=sha,enable=${{ (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && !startsWith(github.ref, 'ref/tags/v') }}
 
       - name: Login to GitHub Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
