@@ -27,9 +27,10 @@
     # Send all queries to avahi2dns (mDNS bridge) first
     forward . 127.0.0.1:5454 {
         prefer_udp
+        max_fails 1
     }
 
-    # If avahi2dns returns NXDOMAIN or SERVFAIL, forward the original
+    # If avahi2dns returns NXDOMAIN, SERVFAIL, or REFUSED, forward the original
     # (pre-rewrite) query to the upstream router DNS.
-    alternate original NXDOMAIN,SERVFAIL . {$UPSTREAM_DNS}
+    alternate original NXDOMAIN,SERVFAIL,REFUSED . {$UPSTREAM_DNS}
 }

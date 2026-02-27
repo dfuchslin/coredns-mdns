@@ -39,7 +39,7 @@ RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
 # --- avahi2dns ---
 # conf.d: set CLI args (debug + listen port)
 # init.d: use supervise-daemon so it backgrounds while logging to Docker stdout
-RUN echo 'command_args="--debug --port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns
+RUN echo 'command_args="--port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns
 RUN sed -i \
     -e '/^command_background=/d' \
     -e '/^output_logger=/d' \
