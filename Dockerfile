@@ -3,6 +3,7 @@ FROM alpine:edge AS base
 RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
 RUN apk add --no-cache openrc avahi2dns@testing avahi2dns-openrc@testing dbus avahi coredns
 
+# --- OpenRC Docker adjustments ---
 RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
     sed -i \
     -e 's/#rc_sys=".*"/rc_sys="docker"/g' \
@@ -10,28 +11,104 @@ RUN sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
     -e 's/#rc_crashed_stop=.*/rc_crashed_stop=NO/g' \
     -e 's/#rc_crashed_start=.*/rc_crashed_start=YES/g' \
     -e 's/#rc_provide=".*"/rc_provide="loopback net dev"/g' \
-    -e 's/#rc_logger="YES"/rc_logger="NO"/' \
     /etc/rc.conf && \
     rm -f /etc/init.d/hwdrivers \
     /etc/init.d/hwclock \
-    /etc/init.d/hwdrivers \
     /etc/init.d/modules \
     /etc/init.d/modules-load \
     /etc/init.d/modloop
 
-RUN echo 'command_args="--debug --port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns && \
-    echo 'command_background=false' >> /etc/init.d/avahi2dns && \
-    echo 'output_logger=""' >> /etc/init.d/avahi2dns && \
-    echo 'error_logger=""' >> /etc/init.d/avahi2dns
-RUN echo 'command_args="--no-chroot --debug"' > /etc/conf.d/avahi-daemon && \
-    echo 'output_logger=""' >> /etc/conf.d/avahi-daemon && \
-    echo 'error_logger=""' >> /etc/conf.d/avahi-daemon && \
-    sed -i 's/#debug=no/debug=yes/' /etc/avahi/avahi-daemon.conf
-RUN echo 'command_args="--nofork --nopidfile"' > /etc/conf.d/dbus && \
-    echo 'output_logger=""' >> /etc/init.d/dbus && \
-    echo 'error_logger=""' >> /etc/init.d/dbus
-RUN echo 'start_stop_daemon_args=""' > /etc/init.d/coredns && \
-    echo 'command_background=false' >> /etc/init.d/coredns
+# --- avahi2dns ---
+# conf.d: set CLI args (debug + listen port)
+# init.d: use supervise-daemon so it backgrounds while logging to Docker stdout
+RUN echo 'command_args="--debug --port 5454 --addr 0.0.0.0"' > /etc/conf.d/avahi2dns
+RUN sed -i \
+    -e '/^command_background=/d' \
+    -e '/^output_logger=/d' \
+    -e '/^error_logger=/d' \
+    -e '/^pidfile=/d' \
+    /etc/init.d/avahi2dns
+RUN sed -i '1a\supervisor="supervise-daemon"' /etc/init.d/avahi2dns && \
+    sed -i '2a\pidfile="/run/avahi2dns.pid"' /etc/init.d/avahi2dns && \
+    sed -i '3a\start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"' /etc/init.d/avahi2dns
+
+# --- avahi-daemon ---
+# The packaged init script hardcodes "avahi-daemon -D" (daemonize) in a custom
+# start() function, ignoring command_args from conf.d entirely. Replace it with
+# a standard OpenRC script using supervise-daemon so it backgrounds properly
+# while still sending output to Docker's stdout/stderr.
+# No --debug flag: only warnings/errors will be logged.
+RUN cat > /etc/init.d/avahi-daemon <<'EOF'
+#!/sbin/openrc-run
+
+description="Avahi mDNS/DNS-SD daemon"
+supervisor="supervise-daemon"
+command="/usr/sbin/avahi-daemon"
+command_args="--no-drop-root --no-chroot"
+pidfile="/run/${RC_SVCNAME}.pid"
+start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"
+extra_started_commands="reload"
+
+depend() {
+	before netmount nfsmount
+	use net
+	need dbus hostname
+}
+
+reload() {
+	ebegin "Reloading avahi-daemon"
+	/usr/sbin/avahi-daemon -r
+	eend $?
+}
+EOF
+RUN chmod 755 /etc/init.d/avahi-daemon
+
+# --- dbus ---
+# Remove --syslog-only so dbus logs go to stderr (captured by start-stop-daemon).
+# Redirect to Docker stdout/stderr via output_log/error_log.
+RUN sed -i 's/--syslog-only //' /etc/init.d/dbus
+RUN printf 'output_logger=""\nerror_logger=""\noutput_log="/proc/1/fd/1"\nerror_log="/proc/1/fd/2"\n' > /etc/conf.d/dbus
+
+# --- coredns ---
+# The packaged init script uses supervise-daemon and logs to /var/log/coredns/.
+# Fix: run as root (we're in Docker), log to /proc/1/fd/{1,2} so Docker captures it,
+# and run in foreground.
+RUN sed -i \
+    -e 's/^command_user=.*/command_user="root"/' \
+    -e 's|^start_stop_daemon_args=.*|start_stop_daemon_args="--stdout /proc/1/fd/1 --stderr /proc/1/fd/2"|' \
+    -e '/^[[:space:]]*--stderr/d' \
+    -e 's/^capabilities=.*/# capabilities removed for Docker/' \
+    -e 's/after net/after net\n\tneed avahi2dns/' \
+    /etc/init.d/coredns
+# conf.d: keep extra args empty (logging is via Corefile 'log' plugin)
+RUN sed -i 's/^COREDNS_EXTRA_ARGS=.*/COREDNS_EXTRA_ARGS=""/' /etc/conf.d/coredns
+
+# --- Corefile ---
+# Rewrites bare hostnames (no dots) to <name>.local, queries avahi2dns.
+# Also forwards .local directly. Everything else goes to upstream DNS.
+RUN cat > /etc/coredns/Corefile <<'COREFILE'
+. {
+    log
+    errors
+
+    # Rewrite bare single-label names (no dots) to <name>.local
+    template ANY ANY {
+        match "^([^.]+)\.$"
+        answer "{{ .Name }} 60 IN CNAME {{ index .Match 1 }}.local."
+        fallthrough
+    }
+
+    # Forward .local queries to avahi2dns
+    forward local. 127.0.0.1:5454
+
+    # Forward everything else to upstream
+    forward . /etc/resolv.conf
+
+    cache 30
+    loop
+    reload
+}
+COREFILE
 
 RUN rc-update add dbus && rc-update add avahi-daemon && rc-update add avahi2dns && rc-update add coredns
 
